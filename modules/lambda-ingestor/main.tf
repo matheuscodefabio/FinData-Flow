@@ -30,6 +30,11 @@ resource "aws_lambda_alias" "stable" {
   name             = "stable"
   function_name    = aws_lambda_function.ingestor.function_name
   function_version = aws_lambda_function.ingestor.version
+
+  lifecycle {
+    # Canary/rollback ajustam routing_config via AWS CLI durante o deploy.
+    ignore_changes = [routing_config]
+  }
 }
 
 resource "aws_lambda_provisioned_concurrency_config" "ingestor" {

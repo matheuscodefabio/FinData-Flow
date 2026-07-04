@@ -19,6 +19,8 @@ Partner -> API Gateway -> Lambda -> SQS -> ECS Fargate
 Frontend: CloudFront -> S3 privado (OAC)
 ```
 
+Diagrama tecnico: [docs/architecture.md](docs/architecture.md)
+
 ## Estrutura do repositorio
 
 ```text
@@ -34,10 +36,31 @@ environments/              # composicao por ambiente
   staging/
   prod/
 .github/workflows/         # CI/CD
-  pr-validate.yml
-  deploy.yml
+  terraform-plan.yml
+  terraform-apply.yml
   health-check.yml
+scripts/
+  smoke-test.sh
+  canary-evaluate.sh
+  lambda-rollback.sh
 ```
+
+## CI/CD e rollback
+
+- `terraform-plan.yml`: valida PR com fmt, tflint, checkov, validate e plan por ambiente.
+- `terraform-apply.yml`: deploy sequencial dev -> staging -> prod com artefato imutavel e passos enxutos.
+- Em prod: canary de Lambda (10%) via `scripts/canary-evaluate.sh`, com promocao para 100% ou rollback automatico.
+- Rollback manual suportado via `workflow_dispatch` em `terraform-apply.yml`.
+
+## Cobertura do desafio
+
+- API <= 150ms P99: Lambda com alias `stable`, provisioned concurrency em prod e alarme de latencia.
+- Processamento longo (10-40 min): ECS Fargate + SQS com visibility timeout de 45 min + DLQ.
+- Borda segura: CloudFront com OAC e bucket S3 privado (sem acesso publico direto).
+- Isolamento e promocao: ambientes dev/staging/prod separados em `environments/` com backends de state isolados.
+- IaC: Terraform modular em `modules/` e composicao por ambiente em `environments/`.
+- CI/CD: validacao de PR (`terraform-plan.yml`) e deploy sequencial com gates (`terraform-apply.yml`).
+- Zero-downtime e rollback: canary de Lambda em prod e rollback automatico/manual no workflow de apply.
 
 ## Como subir
 

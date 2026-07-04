@@ -26,12 +26,12 @@ jobs:
             --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
             --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
             --period 300 \
-            --statistics ExtendedStatistics \
             --extended-statistics p99 \
-            --query 'Datapoints[0].ExtendedStatistics.p99' \
+            --query 'max_by(Datapoints, &Timestamp).ExtendedStatistics.p99' \
             --output text)
+          [[ "$P99" == "None" || -z "$P99" ]] && P99=0
           echo "Lambda P99 Latency: ${P99}ms"
-          if (( $(echo "$P99 > 130" | bc -l) )); then
+          if awk "BEGIN {exit !($P99 > 130)}"; then
             echo "⚠️ P99 latency ABOVE threshold (130ms)"
             exit 1
           fi
@@ -57,6 +57,10 @@ jobs:
             --query 'taskArns | length(@)' \
             --output text)
           echo "Failed ECS tasks (stopped): $FAILED_TASKS"
+          if (( FAILED_TASKS > 2 )); then
+            echo "⚠️ ECS stopped tasks acima do threshold"
+            exit 1
+          fi
 
       - name: Notify on Issues
         if: failure()
