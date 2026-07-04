@@ -1,6 +1,6 @@
 name: Scheduled Health Check & Scaling
 
-on:
+"on":
   schedule:
     - cron: '0 */6 * * *'  # A cada 6 horas
   workflow_dispatch:
@@ -11,56 +11,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_PROD }}
           aws-region: us-east-1
 
-      - name: Check Lambda P99 Latency
+      - name: Run health checks
         run: |
-          P99=$(aws cloudwatch get-metric-statistics \
-            --namespace AWS/Lambda \
-            --metric-name Duration \
-            --dimensions Name=FunctionName,Value=findata-ingestor-prod Name=Resource,Value=findata-ingestor-prod:stable \
-            --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
-            --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
-            --period 300 \
-            --extended-statistics p99 \
-            --query 'max_by(Datapoints, &Timestamp).ExtendedStatistics.p99' \
-            --output text)
-          [[ "$P99" == "None" || -z "$P99" ]] && P99=0
-          echo "Lambda P99 Latency: ${P99}ms"
-          if awk "BEGIN {exit !($P99 > 130)}"; then
-            echo "⚠️ P99 latency ABOVE threshold (130ms)"
-            exit 1
-          fi
-
-      - name: Check SQS DLQ Depth
-        run: |
-          DLQ_DEPTH=$(aws sqs get-queue-attributes \
-            --queue-url $(aws sqs get-queue-url --queue-name findata-processor-dlq-prod --query 'QueueUrl' --output text) \
-            --attribute-names ApproximateNumberOfMessagesVisible \
-            --query 'Attributes.ApproximateNumberOfMessagesVisible' \
-            --output text)
-          echo "DLQ Depth: $DLQ_DEPTH messages"
-          if (( $DLQ_DEPTH > 0 )); then
-            echo "⚠️ DLQ contém mensagens — investigar falhas"
-            exit 1
-          fi
-
-      - name: Check ECS Task Health
-        run: |
-          FAILED_TASKS=$(aws ecs list-tasks \
-            --cluster findata-processor-prod \
-            --desired-status STOPPED \
-            --query 'taskArns | length(@)' \
-            --output text)
-          echo "Failed ECS tasks (stopped): $FAILED_TASKS"
-          if (( FAILED_TASKS > 2 )); then
-            echo "⚠️ ECS stopped tasks acima do threshold"
-            exit 1
-          fi
+          chmod +x scripts/health-check.sh
+          FUNCTION_NAME="findata-ingestor-prod" \
+          ALIAS_NAME="stable" \
+          DLQ_NAME="findata-processor-dlq-prod" \
+          ECS_CLUSTER_NAME="findata-processor-prod" \
+          P99_THRESHOLD_MS="130" \
+          ECS_STOPPED_THRESHOLD="2" \
+          AWS_REGION="us-east-1" \
+          ./scripts/health-check.sh
 
       - name: Notify on Issues
         if: failure()
