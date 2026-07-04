@@ -12,6 +12,13 @@ WINDOW_MINUTES="15"
 POLL_INTERVAL_SECONDS="60"
 AWS_REGION="us-east-1"
 
+print_cloudwatch_refs() {
+  echo "CloudWatch refs:"
+  echo "- Console: https://${AWS_REGION}.console.aws.amazon.com/cloudwatch/home?region=${AWS_REGION}"
+  echo "- Canary metric target: AWS/Lambda Resource=${FUNCTION_NAME}:${NEW_VERSION}"
+  echo "- Metrics checked: Duration p99, Errors Sum, Invocations Sum"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --function-name) FUNCTION_NAME="$2"; shift 2 ;;
@@ -39,6 +46,7 @@ if [[ "$PREVIOUS_VERSION" == "$NEW_VERSION" ]]; then
 fi
 
 rollback() {
+  print_cloudwatch_refs
   ./scripts/lambda-rollback.sh "$FUNCTION_NAME" "$ALIAS_NAME" "$PREVIOUS_VERSION" "$AWS_REGION"
 }
 
@@ -121,3 +129,4 @@ aws lambda update-alias \
   --routing-config "AdditionalVersionWeights={}"
 
 echo "canary healthy and promoted to 100%"
+print_cloudwatch_refs

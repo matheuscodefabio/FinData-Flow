@@ -9,6 +9,20 @@ AWS_REGION="${AWS_REGION:-us-east-1}"
 P99_THRESHOLD_MS="${P99_THRESHOLD_MS:-130}"
 ECS_STOPPED_THRESHOLD="${ECS_STOPPED_THRESHOLD:-2}"
 
+print_cloudwatch_refs() {
+  echo "CloudWatch refs:"
+  echo "- Console: https://${AWS_REGION}.console.aws.amazon.com/cloudwatch/home?region=${AWS_REGION}"
+  echo "- Lambda metric: AWS/Lambda Duration p99 (FunctionName=${FUNCTION_NAME}, Resource=${FUNCTION_NAME}:${ALIAS_NAME})"
+  echo "- DLQ metric: AWS/SQS ApproximateNumberOfMessagesVisible (QueueName=${DLQ_NAME})"
+  echo "- ECS check: cluster=${ECS_CLUSTER_NAME}, desired-status=STOPPED"
+}
+
+fail_check() {
+  echo "$1"
+  print_cloudwatch_refs
+  exit 1
+}
+
 START_TIME=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S)
 END_TIME=$(date -u +%Y-%m-%dT%H:%M:%S)
 
@@ -28,8 +42,7 @@ P99=$(aws cloudwatch get-metric-statistics \
 
 echo "Lambda P99 Latency: ${P99}ms"
 if awk "BEGIN {exit !($P99 > $P99_THRESHOLD_MS)}"; then
-  echo "P99 latency ABOVE threshold (${P99_THRESHOLD_MS}ms)"
-  exit 1
+  fail_check "P99 latency ABOVE threshold (${P99_THRESHOLD_MS}ms)"
 fi
 
 DLQ_URL=$(aws sqs get-queue-url \
@@ -49,8 +62,7 @@ DLQ_DEPTH=$(aws sqs get-queue-attributes \
 
 echo "DLQ Depth: $DLQ_DEPTH messages"
 if (( DLQ_DEPTH > 0 )); then
-  echo "DLQ contem mensagens — investigar falhas"
-  exit 1
+  fail_check "DLQ contem mensagens — investigar falhas"
 fi
 
 FAILED_TASKS=$(aws ecs list-tasks \
@@ -64,8 +76,8 @@ FAILED_TASKS=$(aws ecs list-tasks \
 
 echo "Failed ECS tasks (stopped): $FAILED_TASKS"
 if (( FAILED_TASKS > ECS_STOPPED_THRESHOLD )); then
-  echo "ECS stopped tasks acima do threshold (${ECS_STOPPED_THRESHOLD})"
-  exit 1
+  fail_check "ECS stopped tasks acima do threshold (${ECS_STOPPED_THRESHOLD})"
 fi
 
 echo "health-check ok"
+print_cloudwatch_refs
