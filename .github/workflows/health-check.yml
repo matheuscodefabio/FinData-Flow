@@ -1,0 +1,67 @@
+name: Scheduled Health Check & Scaling
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # A cada 6 horas
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    name: Monitor Prod Health
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_PROD }}
+          aws-region: us-east-1
+
+      - name: Check Lambda P99 Latency
+        run: |
+          P99=$(aws cloudwatch get-metric-statistics \
+            --namespace AWS/Lambda \
+            --metric-name Duration \
+            --dimensions Name=FunctionName,Value=findata-ingestor-prod Name=Resource,Value=findata-ingestor-prod:stable \
+            --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
+            --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+            --period 300 \
+            --statistics ExtendedStatistics \
+            --extended-statistics p99 \
+            --query 'Datapoints[0].ExtendedStatistics.p99' \
+            --output text)
+          echo "Lambda P99 Latency: ${P99}ms"
+          if (( $(echo "$P99 > 130" | bc -l) )); then
+            echo "⚠️ P99 latency ABOVE threshold (130ms)"
+            exit 1
+          fi
+
+      - name: Check SQS DLQ Depth
+        run: |
+          DLQ_DEPTH=$(aws sqs get-queue-attributes \
+            --queue-url $(aws sqs get-queue-url --queue-name findata-processor-dlq-prod --query 'QueueUrl' --output text) \
+            --attribute-names ApproximateNumberOfMessagesVisible \
+            --query 'Attributes.ApproximateNumberOfMessagesVisible' \
+            --output text)
+          echo "DLQ Depth: $DLQ_DEPTH messages"
+          if (( $DLQ_DEPTH > 0 )); then
+            echo "⚠️ DLQ contém mensagens — investigar falhas"
+            exit 1
+          fi
+
+      - name: Check ECS Task Health
+        run: |
+          FAILED_TASKS=$(aws ecs list-tasks \
+            --cluster findata-processor-prod \
+            --desired-status STOPPED \
+            --query 'taskArns | length(@)' \
+            --output text)
+          echo "Failed ECS tasks (stopped): $FAILED_TASKS"
+
+      - name: Notify on Issues
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: "⚠️ FinData PROD health check FAILED — verifique CloudWatch"
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}

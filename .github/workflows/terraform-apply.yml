@@ -1,0 +1,122 @@
+name: Terraform Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'environments/**'
+      - 'modules/**'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      lambda_image_uri:    ${{ steps.meta.outputs.lambda_uri }}
+      processor_image_uri: ${{ steps.meta.outputs.processor_uri }}
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
+          aws-region: us-east-1
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push — Lambda Ingestor
+        id: meta
+        run: |
+          COMMIT_SHA=${GITHUB_SHA::8}
+          LAMBDA_URI="${{ steps.ecr.outputs.registry }}/findata-ingestor:${COMMIT_SHA}"
+          PROCESSOR_URI="${{ steps.ecr.outputs.registry }}/findata-processor:${COMMIT_SHA}"
+          
+          docker build -t $LAMBDA_URI ./services/ingestor
+          docker push $LAMBDA_URI
+          
+          docker build -t $PROCESSOR_URI ./services/processor
+          docker push $PROCESSOR_URI
+          
+          echo "lambda_uri=${LAMBDA_URI}" >> $GITHUB_OUTPUT
+          echo "processor_uri=${PROCESSOR_URI}" >> $GITHUB_OUTPUT
+
+  deploy-dev:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_DEV }}
+          aws-region: us-east-1
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+      - name: Apply DEV
+        working-directory: environments/dev
+        run: |
+          terraform init
+          terraform apply -auto-approve
+        env:
+          TF_VAR_lambda_image_uri:    ${{ needs.build-and-push.outputs.lambda_image_uri }}
+          TF_VAR_processor_image_uri: ${{ needs.build-and-push.outputs.processor_image_uri }}
+          TF_VAR_db_secret_arn:       ${{ secrets.DB_SECRET_ARN_DEV }}
+          TF_VAR_sns_alert_arn:       ${{ secrets.SNS_ALERT_ARN_DEV }}
+      - name: Smoke Test DEV
+        run: |
+          API_URL=$(terraform -chdir=environments/dev output -raw api_endpoint)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${API_URL}/ingest" \
+            -H "Content-Type: application/json" \
+            -d '{"test": true}')
+          [ "$STATUS" = "200" ] || (echo "Smoke test falhou: HTTP $STATUS" && exit 1)
+
+  deploy-staging:
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_STAGING }}
+          aws-region: us-east-1
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+      - name: Apply STAGING
+        working-directory: environments/staging
+        run: |
+          terraform init
+          terraform apply -auto-approve
+        env:
+          TF_VAR_lambda_image_uri:    ${{ needs.build-and-push.outputs.lambda_image_uri }}
+          TF_VAR_processor_image_uri: ${{ needs.build-and-push.outputs.processor_image_uri }}
+          TF_VAR_db_secret_arn:       ${{ secrets.DB_SECRET_ARN_STAGING }}
+          TF_VAR_sns_alert_arn:       ${{ secrets.SNS_ALERT_ARN_STAGING }}
+
+  deploy-prod:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: prod  # requer aprovação manual no GitHub Environments
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
+          aws-region: us-east-1
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+      - name: Apply PROD
+        working-directory: environments/prod
+        run: |
+          terraform init
+          terraform apply -auto-approve
+        env:
+          TF_VAR_lambda_image_uri:    ${{ needs.build-and-push.outputs.lambda_image_uri }}
+          TF_VAR_processor_image_uri: ${{ needs.build-and-push.outputs.processor_image_uri }}
+          TF_VAR_db_secret_arn:       ${{ secrets.DB_SECRET_ARN_PROD }}
+          TF_VAR_sns_alert_arn:       ${{ secrets.SNS_ALERT_ARN_PROD }}
