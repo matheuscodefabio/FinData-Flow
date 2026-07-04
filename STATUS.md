@@ -7,8 +7,7 @@ Atualizado em 2026-07-03.
 - Estrutura Terraform com modulos reutilizaveis em [modules](modules)
 - Ambientes separados em [environments/dev](environments/dev), [environments/staging](environments/staging) e [environments/prod](environments/prod)
 - Backend remoto de state via [bootstrap/main.tf](bootstrap/main.tf)
-- Pipeline CI/CD em [ .github/workflows/deploy.yml ](.github/workflows/deploy.yml)
-- Workflow de health check em [ .github/workflows/health-check.yml ](.github/workflows/health-check.yml)
+- Pipeline CI/CD em [ .github/workflows/terraform-plan.yml ](.github/workflows/terraform-plan.yml) e [ .github/workflows/terraform-apply.yml ](.github/workflows/terraform-apply.yml)
 
 ## Ajustes recentes
 
@@ -19,4 +18,3 @@ Atualizado em 2026-07-03.
 
 - Trocar placeholders `ACCOUNT_ID` e ARNs de exemplo nos `terraform.tfvars`
 - Validar deploy real por ambiente (`terraform plan` e `terraform apply`)
-- Revisar thresholds e queries do health check com metricas reais da conta

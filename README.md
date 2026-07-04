@@ -15,6 +15,7 @@ Partner -> API Gateway -> Lambda -> SQS -> ECS Fargate
                                  |            |
                                  |            +-> RDS (dados)
                                  +-> DLQ      +-> DynamoDB (estado)
+                                 +-> CloudWatch (logs, metricas, alarmes)
 
 Frontend: CloudFront -> S3 privado (OAC)
 ```
@@ -31,6 +32,7 @@ modules/                   # modulos Terraform reutilizaveis
   sqs/
   ecs-processor/
   frontend/
+docs/                      # arquitetura e diagramas
 environments/              # composicao por ambiente
   dev/
   staging/
@@ -38,7 +40,6 @@ environments/              # composicao por ambiente
 .github/workflows/         # CI/CD
   terraform-plan.yml
   terraform-apply.yml
-  health-check.yml
 scripts/
   smoke-test.sh
   canary-evaluate.sh
@@ -59,6 +60,7 @@ scripts/
 - Borda segura: CloudFront com OAC e bucket S3 privado (sem acesso publico direto).
 - Isolamento e promocao: ambientes dev/staging/prod separados em `environments/` com backends de state isolados.
 - IaC: Terraform modular em `modules/` e composicao por ambiente em `environments/`.
+- Observabilidade: CloudWatch Logs, Metric Alarms e dashboards/metricas para Lambda, SQS e ECS.
 - CI/CD: validacao de PR (`terraform-plan.yml`) e deploy sequencial com gates (`terraform-apply.yml`).
 - Zero-downtime e rollback: canary de Lambda em prod e rollback automatico/manual no workflow de apply.
 
@@ -85,5 +87,4 @@ terraform apply
 
 - Os ambientes usam os mesmos modulos; o que muda sao os `terraform.tfvars`.
 - Se aparecer erro de sintaxe Terraform, valide primeiro os arquivos `variables.tf`.
-- O health check em [ .github/workflows/health-check.yml ](.github/workflows/health-check.yml) roda por cron (a cada 6 horas) e tambem manualmente (`workflow_dispatch`).
 
