@@ -3,6 +3,7 @@ resource "aws_lambda_function" "ingestor" {
   role          = aws_iam_role.lambda.arn
   package_type  = "Image"
   image_uri     = var.image_uri
+  publish       = true
   timeout       = 10
   memory_size   = var.memory_size
 
@@ -25,7 +26,6 @@ resource "aws_lambda_function" "ingestor" {
   tags = { Environment = var.environment }
 }
 
-# Provisioned Concurrency: elimina cold start em horário de pico
 resource "aws_lambda_alias" "stable_direct" {
   count            = var.enable_canary ? 0 : 1
   name             = "stable"
@@ -51,6 +51,7 @@ locals {
   stable_alias_invoke_arn = var.enable_canary ? aws_lambda_alias.stable_codedeploy[0].invoke_arn : aws_lambda_alias.stable_direct[0].invoke_arn
 }
 
+# Provisioned Concurrency reduz cold start para a versao principal do alias.
 resource "aws_lambda_provisioned_concurrency_config" "ingestor" {
   count                             = var.environment == "prod" ? 1 : 0
   function_name                     = aws_lambda_function.ingestor.function_name
@@ -81,6 +82,15 @@ resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.ingestor.id
   name        = "$default"
   auto_deploy = true
+}
+
+resource "aws_lambda_permission" "apigw_invoke_alias" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.ingestor.function_name
+  qualifier     = local.stable_alias_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.ingestor.execution_arn}/*/*"
 }
 
 resource "aws_iam_role" "lambda" {
@@ -149,6 +159,9 @@ resource "aws_cloudwatch_metric_alarm" "canary_p99_latency" {
   treat_missing_data  = "notBreaching"
   alarm_actions       = [var.sns_alert_arn]
 
+  # O alarme acompanha a ultima versao publicada no apply atual.
+  # Se houver rollback manual para versao antiga, a dimensao sera alinhada no proximo apply.
+
   metric_query {
     id          = "p99_duration"
     return_data = true
@@ -174,6 +187,9 @@ resource "aws_cloudwatch_metric_alarm" "canary_error_rate" {
   threshold           = 0.02
   treat_missing_data  = "notBreaching"
   alarm_actions       = [var.sns_alert_arn]
+
+  # O alarme acompanha a ultima versao publicada no apply atual.
+  # Se houver rollback manual para versao antiga, a dimensao sera alinhada no proximo apply.
 
   metric_query {
     id          = "m_errors"

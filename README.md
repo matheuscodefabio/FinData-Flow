@@ -56,6 +56,7 @@ scripts/
 
 - Canary em producao via CodeDeploy (10% por 15 minutos) para zero-downtime.
 - Alarmes de seguranca: P99 em 130ms (margem antes do SLO de 150ms) e taxa de erro acima de 2%.
+- Durante a janela de canary, o trafego desviado para a nova versao pode executar sem provisioned concurrency, com possibilidade de cold start; thresholds e `evaluation_periods` foram definidos considerando esse comportamento.
 - Auto rollback por `DEPLOYMENT_FAILURE` e `DEPLOYMENT_STOP_ON_ALARM`.
 
 ## Contrato de imagens
