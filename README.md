@@ -58,6 +58,8 @@ scripts/
 - Alarmes de seguranca: P99 em 130ms (margem antes do SLO de 150ms) e taxa de erro acima de 2%.
 - Durante a janela de canary, o trafego desviado para a nova versao pode executar sem provisioned concurrency, com possibilidade de cold start; thresholds e `evaluation_periods` foram definidos considerando esse comportamento.
 - Auto rollback por `DEPLOYMENT_FAILURE` e `DEPLOYMENT_STOP_ON_ALARM`.
+- Rollback de emergencia usa `aws lambda update-alias` direto para retorno imediato da versao `stable`, sem esperar janela de canary.
+- O smoke test pos-promocao e uma verificacao final do endpoint; a decisao de auto-rollback ja foi tomada durante o canary com trafego real.
 
 ## Contrato de imagens
 
@@ -99,8 +101,16 @@ terraform plan
 terraform apply
 ```
 
+## Configuracao do GitHub Actions
+
+- Secrets por environment (`dev`, `staging`, `prod`): `AWS_ROLE_ARN`, `DB_SECRET_ARN`, `SNS_ALERT_ARN`.
+- Secrets do repositorio: `AWS_ACCOUNT_ID`.
+- Variables do repositorio: `LAMBDA_IMAGE_URI`, `PROCESSOR_IMAGE_URI` com digest `@sha256`.
+- Criar os environments `dev`, `staging` e `prod` em Settings > Environments.
+- Em `prod`, habilitar required reviewers como gate de aprovacao.
+
 ## Notas praticas
 
 - Os ambientes usam os mesmos modulos; o que muda sao os `terraform.tfvars`.
-- Se aparecer erro de sintaxe Terraform, valide primeiro os arquivos `variables.tf`.
+- Antes de abrir PR, rode `terraform fmt -check -recursive` e `terraform validate`.
 

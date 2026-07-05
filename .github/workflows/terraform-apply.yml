@@ -102,6 +102,7 @@ jobs:
   deploy-prod:
     name: Deploy PROD + CodeDeploy Canary
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [deploy-preprod, resolve-artifact]
     if: github.event_name == 'push' || inputs.action == 'deploy'
     environment: prod
@@ -217,55 +218,19 @@ jobs:
           }
           FUNCTION_NAME="findata-ingestor-prod"
           ALIAS_NAME="stable"
-          APP_NAME="findata-lambda-prod"
-          DEPLOYMENT_GROUP_NAME="findata-lambda-dg-prod"
 
           aws lambda get-function \
             --region "${{ env.AWS_REGION }}" \
             --function-name "$FUNCTION_NAME" \
             --qualifier "${{ inputs.previous_version }}" > /dev/null
 
-          CURRENT_VERSION=$(aws lambda get-alias \
-            --region "${{ env.AWS_REGION }}" \
-            --function-name "$FUNCTION_NAME" \
-            --name "$ALIAS_NAME" \
-            --query 'FunctionVersion' --output text)
-
-          cat > appspec.yaml <<EOF
-          version: 0.0
-          Resources:
-            - FinDataIngestor:
-                Type: AWS::Lambda::Function
-                Properties:
-                  Name: ${FUNCTION_NAME}
-                  Alias: ${ALIAS_NAME}
-                  CurrentVersion: ${CURRENT_VERSION}
-                  TargetVersion: ${{ inputs.previous_version }}
-          EOF
-
-          CONTENT=$(jq -Rs . < appspec.yaml)
-          cat > revision.json <<EOF
-          {
-            "revisionType": "AppSpecContent",
-            "appSpecContent": {
-              "content": ${CONTENT}
-            }
-          }
-          EOF
-
-          DEPLOYMENT_ID=$(aws deploy create-deployment \
-            --region "${{ env.AWS_REGION }}" \
-            --application-name "$APP_NAME" \
-            --deployment-group-name "$DEPLOYMENT_GROUP_NAME" \
-            --revision file://revision.json \
-            --description "Manual rollback to version ${{ inputs.previous_version }}" \
-            --query 'deploymentId' \
-            --output text)
-
-          echo "DEPLOYMENT_ID=$DEPLOYMENT_ID" >> "$GITHUB_ENV"
-
-      - name: Wait rollback deployment
+      - name: Execute emergency rollback (update alias)
         run: |
-          aws deploy wait deployment-successful \
+          aws lambda update-alias \
             --region "${{ env.AWS_REGION }}" \
-            --deployment-id "$DEPLOYMENT_ID"
+            --function-name "findata-ingestor-prod" \
+            --name "stable" \
+            --function-version "${{ inputs.previous_version }}" \
+            --routing-config "AdditionalVersionWeights={}"
+
+          echo "Rollback aplicado: stable -> versão ${{ inputs.previous_version }}"
