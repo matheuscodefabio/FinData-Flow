@@ -44,6 +44,12 @@ variable "lambda_provisioned_concurrency" {
   default     = 0
 }
 
+variable "enable_canary" {
+  type        = bool
+  description = "Habilita deploy canary via CodeDeploy para Lambda"
+  default     = false
+}
+
 # ECS Processor
 variable "processor_image_uri" {
   type        = string

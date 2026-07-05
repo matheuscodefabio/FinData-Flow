@@ -42,16 +42,31 @@ environments/              # composicao por ambiente
   terraform-apply.yml
 scripts/
   smoke-test.sh
-  canary-evaluate.sh
-  lambda-rollback.sh
 ```
 
 ## CI/CD e rollback
 
 - `terraform-plan.yml`: valida PR com fmt, tflint, checkov, validate e plan por ambiente.
 - `terraform-apply.yml`: deploy sequencial dev -> staging -> prod com artefato imutavel e passos enxutos.
-- Em prod: canary de Lambda (10%) via `scripts/canary-evaluate.sh`, com promocao para 100% ou rollback automatico.
-- Rollback manual suportado via `workflow_dispatch` em `terraform-apply.yml`.
+- Em prod: CodeDeploy nativo para Lambda com `CodeDeployDefault.LambdaCanary10Percent15Minutes`.
+- Rollback automatico por alarmes CloudWatch (P99 > 130ms e error rate > 2%), independente do estado do runner/pipeline.
+- Rollback manual suportado via `workflow_dispatch` no proprio CodeDeploy.
+
+## Deployment strategy
+
+- Canary em producao via CodeDeploy (10% por 15 minutos) para zero-downtime.
+- Alarmes de seguranca: P99 em 130ms (margem antes do SLO de 150ms) e taxa de erro acima de 2%.
+- Auto rollback por `DEPLOYMENT_FAILURE` e `DEPLOYMENT_STOP_ON_ALARM`.
+
+## Contrato de imagens
+
+- Este repositório de infraestrutura nao builda imagem Docker.
+- O repositório de aplicacao deve buildar, escanear e publicar no ECR.
+- A promocao usa imagem imutavel com digest (`@sha256`) em `vars.LAMBDA_IMAGE_URI` e `vars.PROCESSOR_IMAGE_URI`.
+
+## Escolha IaC
+
+- O edital prefere CDK, mas a implementacao usa Terraform por especialidade operacional em ambientes de producao e estrategia multi-conta/multi-regiao com modulos reutilizaveis.
 
 ## Cobertura do desafio
 
@@ -62,7 +77,7 @@ scripts/
 - IaC: Terraform modular em `modules/` e composicao por ambiente em `environments/`.
 - Observabilidade: CloudWatch Logs, Metric Alarms e dashboards/metricas para Lambda, SQS e ECS.
 - CI/CD: validacao de PR (`terraform-plan.yml`) e deploy sequencial com gates (`terraform-apply.yml`).
-- Zero-downtime e rollback: canary de Lambda em prod e rollback automatico/manual no workflow de apply.
+- Zero-downtime e rollback: CodeDeploy canary para Lambda em prod com rollback automatico/manual.
 
 ## Como subir
 

@@ -22,8 +22,8 @@ resource "aws_ecs_task_definition" "processor" {
     essential = true
 
     environment = [
-      { name = "ENVIRONMENT",    value = var.environment },
-      { name = "SQS_QUEUE_URL",  value = var.sqs_queue_url }
+      { name = "ENVIRONMENT", value = var.environment },
+      { name = "SQS_QUEUE_URL", value = var.sqs_queue_url }
     ]
 
     secrets = [

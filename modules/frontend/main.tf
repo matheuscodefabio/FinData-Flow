@@ -97,9 +97,9 @@ resource "aws_cloudfront_distribution" "frontend" {
       }
     }
 
-    compress            = true
-    default_ttl         = 300       # 5 min para JS/CSS com versioning
-    max_ttl             = 31536000  # 1 ano para assets com content hash
+    compress               = true
+    default_ttl            = 300      # 5 min para JS/CSS com versioning
+    max_ttl                = 31536000 # 1 ano para assets com content hash
     viewer_protocol_policy = "redirect-to-https"
   }
 
@@ -131,8 +131,6 @@ resource "aws_cloudfront_distribution" "frontend" {
   tags = {
     Environment = var.environment
   }
-
-  depends_on = [aws_s3_bucket_policy.frontend]
 }
 
 # Bucket para logs de CloudFront

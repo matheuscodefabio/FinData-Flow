@@ -13,3 +13,11 @@ output "lambda_function_name" {
 output "lambda_alias_name" {
   value = module.lambda_ingestor.lambda_alias_name
 }
+
+output "codedeploy_app_name" {
+  value = module.lambda_ingestor.codedeploy_app_name
+}
+
+output "deployment_group_name" {
+  value = module.lambda_ingestor.deployment_group_name
+}

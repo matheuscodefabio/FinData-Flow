@@ -1,37 +1,42 @@
 variable "environment" {
-	type = string
+  type = string
 }
 
 variable "image_uri" {
-	type = string
+  type = string
 }
 
 variable "memory_size" {
-	type    = number
-	default = 512
+  type    = number
+  default = 512
 }
 
 variable "provisioned_concurrency" {
-	type    = number
-	default = 5
+  type    = number
+  default = 5
 }
 
 variable "subnet_ids" {
-	type = list(string)
+  type = list(string)
 }
 
 variable "security_group_id" {
-	type = string
+  type = string
 }
 
 variable "sqs_queue_url" {
-	type = string
+  type = string
 }
 
 variable "sqs_queue_arn" {
-	type = string
+  type = string
 }
 
 variable "sns_alert_arn" {
-	type = string
+  type = string
+}
+
+variable "enable_canary" {
+  type    = bool
+  default = false
 }

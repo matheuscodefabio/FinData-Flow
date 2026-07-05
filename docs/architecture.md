@@ -53,4 +53,4 @@ flowchart LR
 
 - O plan valida PRs antes da promocao.
 - O apply faz deploy sequencial entre ambientes.
-- O deploy de producao usa canary e permite rollback rapido da versao do alias Lambda.
+- O deploy de producao usa CodeDeploy canary (10%/15min) e rollback automatico por alarmes CloudWatch.

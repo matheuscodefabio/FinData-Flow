@@ -40,6 +40,7 @@ module "lambda_ingestor" {
   sqs_queue_url           = module.sqs.queue_url
   sqs_queue_arn           = module.sqs.queue_arn
   sns_alert_arn           = var.sns_alert_arn
+  enable_canary           = var.enable_canary
 }
 
 module "ecs_processor" {
@@ -60,6 +61,6 @@ module "ecs_processor" {
 module "frontend" {
   source = "../../modules/frontend"
 
-  environment             = var.environment
+  environment            = var.environment
   cloudfront_price_class = var.cloudfront_price_class
 }

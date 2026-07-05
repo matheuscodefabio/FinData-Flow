@@ -10,9 +10,9 @@ public_subnet_cidrs  = ["10.0.101.0/24", "10.0.102.0/24"]
 availability_zones   = ["us-east-1a", "us-east-1b"]
 
 # Lambda: alto desempenho com Provisioned Concurrency
-lambda_image_uri                = "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/findata-ingestor:latest"
-lambda_memory_size              = 512
-lambda_provisioned_concurrency  = 10
+lambda_image_uri               = "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/findata-ingestor:latest"
+lambda_memory_size             = 512
+lambda_provisioned_concurrency = 10
 
 # ECS: recursos máximos para processamento heavy
 processor_image_uri = "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/findata-processor:latest"
