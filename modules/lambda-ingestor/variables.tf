@@ -32,6 +32,14 @@ variable "sqs_queue_arn" {
   type = string
 }
 
+variable "db_state_table_arn" {
+  type = string
+}
+
+variable "db_state_table_name" {
+  type = string
+}
+
 variable "sns_alert_arn" {
   type = string
 }

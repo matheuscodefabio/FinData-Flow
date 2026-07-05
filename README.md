@@ -29,6 +29,7 @@ bootstrap/                 # cria backend remoto (S3 + DynamoDB lock)
 modules/                   # modulos Terraform reutilizaveis
   networking/
   lambda-ingestor/
+  dynamodb-state/
   sqs/
   ecs-processor/
   frontend/
@@ -50,7 +51,7 @@ scripts/
 - `terraform-apply.yml`: deploy sequencial dev -> staging -> prod com artefato imutavel e passos enxutos.
 - Em prod: CodeDeploy nativo para Lambda com `CodeDeployDefault.LambdaCanary10Percent15Minutes`.
 - Rollback automatico por alarmes CloudWatch (P99 > 130ms e error rate > 2%), independente do estado do runner/pipeline.
-- Rollback manual suportado via `workflow_dispatch` no proprio CodeDeploy.
+- Rollback manual de emergencia via `workflow_dispatch` com `aws lambda update-alias` imediato.
 
 ## Deployment strategy
 
@@ -67,6 +68,11 @@ scripts/
 - O repositório de aplicacao deve buildar, escanear e publicar no ECR.
 - A promocao usa imagem imutavel com digest (`@sha256`) em `vars.LAMBDA_IMAGE_URI` e `vars.PROCESSOR_IMAGE_URI`.
 
+## Escopo
+
+- O RDS e provisionado em stack separada por ter ciclo de vida distinto (dados vs aplicacao), alinhado ao item B.1 do edital.
+- Este repositorio provisiona e opera a camada de aplicacao e processamento, consumindo `db_secret_arn` e o acesso de rede ao banco.
+
 ## Escolha IaC
 
 - O edital prefere CDK, mas a implementacao usa Terraform por especialidade operacional em ambientes de producao e estrategia multi-conta/multi-regiao com modulos reutilizaveis.
@@ -75,6 +81,7 @@ scripts/
 
 - API <= 150ms P99: Lambda com alias `stable`, provisioned concurrency em prod e alarme de latencia.
 - Processamento longo (10-40 min): ECS Fargate + SQS com visibility timeout de 45 min + DLQ.
+- Idempotencia/estado: DynamoDB para estado por `transaction_id` com TTL.
 - Borda segura: CloudFront com OAC e bucket S3 privado (sem acesso publico direto).
 - Isolamento e promocao: ambientes dev/staging/prod separados em `environments/` com backends de state isolados.
 - IaC: Terraform modular em `modules/` e composicao por ambiente em `environments/`.

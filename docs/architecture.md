@@ -59,6 +59,7 @@ flowchart LR
   - `status` (received, processing, done, failed)
   - `ttl` para limpeza automatica de estados expirados
 - Esse estado viabiliza idempotencia, auditoria e retomada de processamento.
+- Escopo deste repositorio: o RDS e mantido em stack separada por ciclo de vida distinto (dados vs aplicacao); aqui consumimos apenas `db_secret_arn` e regras de acesso.
 
 ## A.4 Observabilidade
 

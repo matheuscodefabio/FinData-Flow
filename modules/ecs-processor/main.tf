@@ -23,7 +23,8 @@ resource "aws_ecs_task_definition" "processor" {
 
     environment = [
       { name = "ENVIRONMENT", value = var.environment },
-      { name = "SQS_QUEUE_URL", value = var.sqs_queue_url }
+      { name = "SQS_QUEUE_URL", value = var.sqs_queue_url },
+      { name = "DB_STATE_TABLE_NAME", value = var.db_state_table_name }
     ]
 
     secrets = [
@@ -65,6 +66,20 @@ resource "aws_iam_role_policy_attachment" "ecs_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+resource "aws_iam_role_policy" "ecs_execution_secrets" {
+  name = "secretsmanager-read-db-password"
+  role = aws_iam_role.ecs_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["secretsmanager:GetSecretValue"]
+      Resource = [var.db_secret_arn]
+    }]
+  })
+}
+
 # IAM: Task Role (permissões da aplicação)
 resource "aws_iam_role" "ecs_task" {
   name = "findata-ecs-task-${var.environment}"
@@ -95,4 +110,76 @@ resource "aws_iam_role_policy" "ecs_task_sqs" {
       Resource = [var.sqs_queue_arn]
     }]
   })
+}
+
+resource "aws_iam_role_policy" "ecs_task_dynamodb_state" {
+  name = "dynamodb-state-access"
+  role = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "dynamodb:PutItem",
+        "dynamodb:GetItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:Query"
+      ]
+      Resource = [var.db_state_table_arn]
+    }]
+  })
+}
+
+resource "aws_ecs_service" "processor" {
+  name            = "findata-processor-${var.environment}"
+  cluster         = aws_ecs_cluster.processor.id
+  task_definition = aws_ecs_task_definition.processor.arn
+  launch_type     = "FARGATE"
+  desired_count   = var.desired_count
+
+  network_configuration {
+    subnets          = var.subnet_ids
+    security_groups  = [var.security_group_id]
+    assign_public_ip = false
+  }
+
+  depends_on = [
+    aws_cloudwatch_log_group.processor,
+    aws_iam_role_policy_attachment.ecs_execution,
+    aws_iam_role_policy.ecs_execution_secrets
+  ]
+}
+
+resource "aws_appautoscaling_target" "ecs_service" {
+  max_capacity       = var.max_tasks
+  min_capacity       = var.min_tasks
+  resource_id        = "service/${aws_ecs_cluster.processor.name}/${aws_ecs_service.processor.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+resource "aws_appautoscaling_policy" "ecs_queue_depth" {
+  name               = "findata-ecs-queue-depth-${var.environment}"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.ecs_service.resource_id
+  scalable_dimension = aws_appautoscaling_target.ecs_service.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.ecs_service.service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    target_value       = var.messages_per_task
+    scale_in_cooldown  = 120
+    scale_out_cooldown = 60
+
+    customized_metric_specification {
+      metric_name = "ApproximateNumberOfMessagesVisible"
+      namespace   = "AWS/SQS"
+      statistic   = "Average"
+
+      dimensions {
+        name  = "QueueName"
+        value = var.sqs_queue_name
+      }
+    }
+  }
 }

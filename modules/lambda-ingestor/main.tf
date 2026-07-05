@@ -14,8 +14,9 @@ resource "aws_lambda_function" "ingestor" {
 
   environment {
     variables = {
-      ENVIRONMENT   = var.environment
-      SQS_QUEUE_URL = var.sqs_queue_url
+      ENVIRONMENT         = var.environment
+      SQS_QUEUE_URL       = var.sqs_queue_url
+      DB_STATE_TABLE_NAME = var.db_state_table_name
     }
   }
 
@@ -116,6 +117,25 @@ resource "aws_iam_role_policy" "lambda_sqs" {
       Effect   = "Allow"
       Action   = ["sqs:SendMessage"]
       Resource = [var.sqs_queue_arn]
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "lambda_dynamodb_state" {
+  name = "dynamodb-state"
+  role = aws_iam_role.lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "dynamodb:PutItem",
+        "dynamodb:GetItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:Query"
+      ]
+      Resource = [var.db_state_table_arn]
     }]
   })
 }

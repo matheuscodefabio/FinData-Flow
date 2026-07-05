@@ -68,6 +68,30 @@ variable "ecs_task_memory" {
   default     = 2048
 }
 
+variable "ecs_desired_count" {
+  type        = number
+  description = "Quantidade inicial de tasks ECS"
+  default     = 1
+}
+
+variable "ecs_min_tasks" {
+  type        = number
+  description = "Quantidade minima de tasks ECS"
+  default     = 1
+}
+
+variable "ecs_max_tasks" {
+  type        = number
+  description = "Quantidade maxima de tasks ECS"
+  default     = 10
+}
+
+variable "ecs_messages_per_task" {
+  type        = number
+  description = "Target de mensagens visiveis por task para autoscaling"
+  default     = 10
+}
+
 # RDS e Secrets
 variable "db_secret_arn" {
   type        = string
