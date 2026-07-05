@@ -72,6 +72,7 @@ scripts/
 
 - O RDS e provisionado em stack separada por ter ciclo de vida distinto (dados vs aplicacao), alinhado ao item B.1 do edital.
 - Este repositorio provisiona e opera a camada de aplicacao e processamento, consumindo `db_secret_arn` e o acesso de rede ao banco.
+- Separacao de ciclo de vida: banco de dados (estado persistente e retencao) evolui por governanca propria; aplicacao e processamento evoluem por pipeline mais frequente.
 
 ## Escolha IaC
 

@@ -144,6 +144,10 @@ resource "aws_ecs_service" "processor" {
     assign_public_ip = false
   }
 
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
+
   depends_on = [
     aws_cloudwatch_log_group.processor,
     aws_iam_role_policy_attachment.ecs_execution,
@@ -168,7 +172,7 @@ resource "aws_appautoscaling_policy" "ecs_queue_depth" {
 
   target_tracking_scaling_policy_configuration {
     target_value       = var.messages_per_task
-    scale_in_cooldown  = 120
+    scale_in_cooldown  = 2700
     scale_out_cooldown = 60
 
     customized_metric_specification {

@@ -48,6 +48,7 @@ flowchart LR
 - `maxReceiveCount` com redrive para DLQ evita loop infinito de retries; DLQ com alarme de profundidade (`>0`) para acao operacional.
 - Como SQS standard e at-least-once, o worker precisa ser idempotente.
 - Idempotencia por chave de deduplicacao `transaction_id`, persistindo estado por item no DynamoDB antes de efeitos colaterais.
+- Contrato do worker: durante o processamento de cada lote, a task habilita ECS task scale-in protection (`UpdateTaskProtection` via endpoint do agente ECS) e libera ao concluir; o autoscaling remove apenas tasks ociosas, evitando interrupcao de lotes de ate 40 minutos.
 
 ## A.3 Persistencia de Dados
 
@@ -59,7 +60,8 @@ flowchart LR
   - `status` (received, processing, done, failed)
   - `ttl` para limpeza automatica de estados expirados
 - Esse estado viabiliza idempotencia, auditoria e retomada de processamento.
-- Escopo deste repositorio: o RDS e mantido em stack separada por ciclo de vida distinto (dados vs aplicacao); aqui consumimos apenas `db_secret_arn` e regras de acesso.
+- Escopo deste repositorio: o RDS e mantido em stack separada por ciclo de vida distinto (dados vs aplicacao), em linha com o item B.1 do edital sobre recursos com ciclos diferentes.
+- Aqui consumimos apenas `db_secret_arn` e regras de acesso ao banco.
 
 ## A.4 Observabilidade
 
