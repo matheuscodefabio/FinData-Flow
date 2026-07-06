@@ -74,13 +74,13 @@ scripts/
 
 ## Escolha de IaC: Terraform
 
-O desafio indica preferência por AWS CDK, com abertura para justificar outra ferramenta. A escolha por Terraform foi deliberada, por tres razoes:
+- O desafio indica preferência por AWS CDK, com abertura para justificar outra ferramenta. A escolha por Terraform foi deliberada, por tres razoes:
 
- **Especialidade operacional real**: opero Terraform em producao ha anos em cenarios multi-conta e multi-regiao. Para um sistema financeiro critico, a ferramenta que o time domina profundamente reduz risco operacional, erros de IaC em producao custam mais que a curva de aprendizado que evitam.
+ - **Especialidade operacional real**: opero Terraform em producao ha anos em cenarios multi-conta e multi-regiao. Para um sistema financeiro critico, a ferramenta que o time domina profundamente reduz risco operacional, erros de IaC em producao custam mais que a curva de aprendizado que evitam.
 
- **Fit com o modelo do projeto**: a separacao por ciclos de vida (bootstrap / modules / environments) e o isolamento de state por ambiente sao padroes maduros e explicitos no Terraform. O plan declarativo revisavel em PR (implementado no CI deste repo) e um artefato de auditoria natural para promocao entre ambientes.
+ - **Fit com o modelo do projeto**: a separacao por ciclos de vida (bootstrap / modules / environments) e o isolamento de state por ambiente sao padroes maduros e explicitos no Terraform. O plan declarativo revisavel em PR (implementado no CI deste repo) e um artefato de auditoria natural para promocao entre ambientes.
 
- **Ecossistema de validacao**: o pipeline usa tflint e checkov nativamente sobre HCL, com scan de seguranca antes de qualquer plan.
+ - **Ecossistema de validacao**: o pipeline usa tflint e checkov nativamente sobre HCL, com scan de seguranca antes de qualquer plan.
 
 A decisao nao e ideologica: a estrutura deste repositorio traduz diretamente para CDK (modules → constructs, environments → stacks/stages, backend isolado → bootstrap por conta do CDK). Migrar seria viavel; a escolha atual maximiza confiabilidade da entrega com o ferramental que domino em nivel de producao.
 
