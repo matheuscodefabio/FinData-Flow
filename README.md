@@ -20,8 +20,6 @@ Partner -> API Gateway -> Lambda -> SQS -> ECS Fargate
 Frontend: CloudFront -> S3 privado (OAC)
 ```
 
-Diagrama tecnico: [docs/architecture.md](docs/architecture.md)
-
 ## Estrutura do repositorio
 
 ```text

@@ -1,38 +1,8 @@
 # Arquitetura FinData Flow
 
-```mermaid
-flowchart LR
-  Partner[Parceiros] --> APIGW[API Gateway HTTP API]
-  APIGW --> Lambda[Lambda Ingestor]
+![Arquitetura FinData](architecture.png)
 
-  subgraph VPC[VPC FinData]
-    direction LR
-    subgraph PRV[Subnets privadas]
-      ECS[ECS Fargate Worker]
-      RDS[(RDS - dados financeiros)]
-      DDB[(DynamoDB - estado da transacao)]
-    end
-  end
-
-  Lambda --> SQS[SQS Main Queue]
-  SQS --> ECS
-  SQS --> DLQ[DLQ]
-
-  SM[(AWS Secrets Manager)] --> ECS
-  ECS --> RDS
-  ECS --> DDB
-
-  Lambda -. traces .-> XR[X-Ray]
-  ECS -. traces .-> XR
-
-  Lambda -. logs / metrics / alarms .-> CW[CloudWatch]
-  SQS -. queue depth / age / DLQ .-> CW
-  ECS -. logs / throughput / container insights .-> CW
-  CW -. alertas .-> SNS[SNS / Slack]
-
-  Frontend[React App] --> CF[CloudFront]
-  CF --> S3[(S3 privado com OAC)]
-```
+Os fluxos de frontend e API sao independentes: CloudFront/S3 serve apenas os estaticos do React; o browser chama o API Gateway diretamente, pois o trafego da API e dinamico e nao cacheavel (CORS habilitado no HTTP API).
 
 ## A.1 Modelo de Computacao
 
@@ -54,7 +24,7 @@ flowchart LR
 
 - RDS para dados financeiros com garantias ACID, adequado para reconciliacao e consistencia transacional.
 - Dados e credenciais protegidos com KMS/Secrets Manager; banco em subnets privadas.
-- Security Group do RDS restrito ao Security Group do ECS worker.
+- Security Group do RDS restrito aos Security Groups do ECS worker e da Lambda.
 - DynamoDB para estado por transacao com modelo minimo:
   - `PK = transaction_id`
   - `status` (received, processing, done, failed)
@@ -77,6 +47,7 @@ flowchart LR
   - consulta no CloudWatch Logs Insights filtrando por `transaction_id`
   - estado do item no DynamoDB para saber ultimo status persistido
 - Tracing distribuido com X-Ray (Lambda com tracing ativo) para diagnostico de latencia e falhas entre servicos.
+- A infraestrutura prove o pipeline de observabilidade (log groups, tracing, permissoes); o formato JSON estruturado dos logs e contrato da aplicacao, assim como o task scale-in protection.
 
 ## IaC e ambientes
 
