@@ -1,6 +1,3 @@
-# Bootstrap: cria os recursos necessários para o remote state
-# Rodar UMA vez antes de qualquer ambiente: terraform init && terraform apply
-
 resource "aws_s3_bucket" "tfstate" {
   for_each = toset(["dev", "staging", "prod"])
   bucket   = "findata-tfstate-${each.key}-${data.aws_caller_identity.current.account_id}"
